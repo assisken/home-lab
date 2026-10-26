@@ -1,0 +1,36 @@
+# Grafana's own config for the datasource and the dashboard provider. Both
+# live in the repo, so recreating the grafana-storage PVC loses nothing.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: grafana
+  name: grafana-provisioning
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      # Name and uid are the ones the datasource had when it was created by
+      # hand, so anything that references it keeps working. Provisioning makes
+      # it read-only in the UI.
+      - name: prometheus
+        uid: eg0j2y23e1vk0c
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: false
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      # Filled by the fetch-dashboards init container (grafana-dashboards
+      # ConfigMap). Subdirectories become folders. Provisioned dashboards
+      # cannot be saved in place: "Save as" a copy to customise one.
+      - name: bootstrap
+        type: file
+        disableDeletion: false
+        allowUiUpdates: false
+        updateIntervalSeconds: 60
+        options:
+          path: /var/lib/grafana/dashboards
+          foldersFromFilesStructure: true

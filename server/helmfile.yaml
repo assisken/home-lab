@@ -1,0 +1,56 @@
+# helmfile apply  |  helmfile -l name=traefik apply
+#
+# Chart versions are pinned here and resolved into helmfile.lock
+# (`helmfile deps` after changing one).
+
+# Pin the target, so an apply never lands on whatever the current context
+# is. `make talos-kubeconfig` names the context `home-lab`.
+helmDefaults:
+  kubeContext: home-lab
+
+repositories:
+  - name: cilium
+    url: https://helm.cilium.io
+  - name: traefik
+    url: https://traefik.github.io/charts
+  # OCI only; homarr-labs.github.io/charts is the docs site, not a chart repo.
+  - name: homarr-labs
+    url: ghcr.io/homarr-labs/charts
+    oci: true
+  # bitnami, not bitnami-labs (which owns the source repo).
+  - name: sealed-secrets
+    url: https://bitnami.github.io/sealed-secrets
+
+releases:
+  # Deploy first on a rebuild: sealed-secret workloads wait on it.
+  - name: sealed-secrets
+    namespace: kube-system
+    chart: sealed-secrets/sealed-secrets
+    version: 2.20.0
+    values:
+      - helm/sealed-secrets/values.yml
+
+  - name: cilium
+    namespace: kube-system
+    chart: cilium/cilium
+    # 1.20.2 is the first 1.20 with the kernel-7.2 FnSetRetval fix: 1.20.1
+    # compiled the helper behind `#ifdef HAVE_SET_RETVAL`, 1.20.2 probes it at
+    # runtime via bpf_core_enum_value_exists(). Upstream issue cilium#48016.
+    # Must not go back below this while the host runs >= 7.2.
+    version: 1.20.2
+    values:
+      - helm/cilium/values.yml
+
+  - name: traefik
+    namespace: kube-system
+    chart: traefik/traefik
+    version: 41.7.1
+    values:
+      - helm/traefik/values.yml
+
+  - name: homarr
+    namespace: default
+    chart: homarr-labs/homarr
+    version: 8.34.1
+    values:
+      - helm/homarr/values.yml

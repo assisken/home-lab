@@ -1,0 +1,11 @@
+# apiVersion: cilium.io/v2alpha1
+# kind: CiliumL2AnnouncementPolicy
+# metadata:
+#   name: home-l2
+# spec:
+#   serviceSelector: {}
+#   nodeSelector: {}
+#   interfaces:
+#     - enp2s0
+#   externalIPs: true
+#   loadBalancerIPs: true

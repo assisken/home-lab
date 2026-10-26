@@ -1,0 +1,15 @@
+# kubectl diff -k .  |  kubectl apply -k .  |  kubectl apply -k apps/<name>
+#
+# No commonLabels: they also rewrite spec.selector, which is immutable on
+# existing Deployments, so every apply would fail.
+#
+# Don't change `namespace: default`: SealedSecrets are bound to the namespace
+# they were sealed for. Moving namespace means resealing (see SECRETS.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: default
+
+resources:
+  - apps
+  - monitoring

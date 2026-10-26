@@ -1,0 +1,60 @@
+# Host ingress firewall. Default block; everything below is an explicit
+# allow. Rules match the destination port on the host, so they also cover
+# hostNetwork pods (node-exporter).
+#
+# Firewall changes: apply with `talosctl apply-config --mode=try` first. It
+# rolls back after a timeout unless confirmed.
+apiVersion: v1alpha1
+kind: NetworkDefaultActionConfig
+ingress: block
+---
+# Pods are allowed on every port. Pod -> host traffic includes CoreDNS ->
+# apiserver and Prometheus scraping node-exporter.
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: trusted-tcp
+portSelector:
+  ports:
+    - 1-65535
+  protocol: tcp
+ingress:
+  - subnet: 10.244.0.0/16
+---
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: trusted-udp
+portSelector:
+  ports:
+    - 1-65535
+  protocol: udp
+ingress:
+  - subnet: 10.244.0.0/16
+---
+# Anyone: what the router forwards from the internet.
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: public-tcp
+portSelector:
+  ports:
+    - 80 # Traefik web (redirects to 443)
+    - 443 # Traefik websecure: every *.example.com ingress
+  protocol: tcp
+ingress:
+  - subnet: 0.0.0.0/0
+  - subnet: ::/0
+---
+# LAN only.
+apiVersion: v1alpha1
+kind: NetworkRuleConfig
+name: lan-tcp
+portSelector:
+  ports:
+    - 6443 # kube-apiserver (kubectl from the LAN)
+    - 50000 # Talos apid (talosctl): the only admin path, there is no SSH
+    - 30003 # suwayomi (Mihon clients)
+    - 30006 # deluge daemon RPC
+    - 30008 # jellyfin (TV/phone apps)
+  protocol: tcp
+ingress:
+  - subnet: 192.168.0.0/16
+  - subnet: fc00::/7

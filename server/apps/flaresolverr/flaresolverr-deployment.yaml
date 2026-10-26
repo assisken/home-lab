@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: flaresolverr
+  name: flaresolverr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flaresolverr
+  template:
+    metadata:
+      labels:
+        app: flaresolverr
+    spec:
+      containers:
+        - env:
+            - name: TZ
+              value: Etc/UTC
+          # Upstream cuts semver tags again; 3.0.4 is the same image as the
+          # digest of `latest` that was pinned here before (checked 2026-10-13).
+          image: ghcr.io/thephaseless/byparr:3.0.4
+          name: flaresolverr
+          ports:
+            - containerPort: 8191
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 256m
+              memory: 256Mi
+      restartPolicy: Always

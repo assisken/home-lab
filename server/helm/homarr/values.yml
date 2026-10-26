@@ -1,0 +1,10 @@
+env:
+  TZ: "Etc/UTC"
+
+# The board, its apps and the admin user live in /appdata/db.sqlite. Without
+# this it sits on the container filesystem and every restart starts over at
+# onboarding.
+persistence:
+  homarrDatabase:
+    enabled: true
+    size: 1Gi

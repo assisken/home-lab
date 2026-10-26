@@ -1,0 +1,39 @@
+# Patch over the generated config, applied to the whole cluster. Talos 1.14
+# splits cluster settings into typed documents; a document here with the same
+# kind (and name) is merged into the generated one, `$patch: delete` drops it.
+cluster:
+  etcd:
+    # The Cilium interfaces carry addresses too.
+    advertisedSubnets:
+      - 192.168.1.0/24
+---
+# No kube-proxy: Cilium's kube-proxy replacement does this. (No CNI document
+# either: talconfig's `cniConfig: none` leaves out KubeFlannelCNIConfig.)
+apiVersion: v1alpha1
+kind: KubeProxyConfig
+$$patch: delete # `$$` escapes talhelper's envsubst
+---
+# Talos enforces the `baseline` Pod Security profile everywhere but
+# kube-system. Most of `default` is hostPath (media), hostNetwork
+# (node-exporter) or privileged (jellyfin), and local-path's helper pods mount
+# hostPath too, so those namespaces are exempt. The list is appended to
+# Talos's own (kube-system).
+apiVersion: v1alpha1
+kind: KubeAdmissionControlConfig
+name: PodSecurity
+configuration:
+  apiVersion: pod-security.admission.config.k8s.io/v1
+  kind: PodSecurityConfiguration
+  defaults:
+    enforce: baseline
+    enforce-version: latest
+    audit: restricted
+    audit-version: latest
+    warn: restricted
+    warn-version: latest
+  exemptions:
+    namespaces:
+      - default
+      - local-path-storage
+    runtimeClasses: []
+    usernames: []

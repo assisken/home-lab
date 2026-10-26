@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bazarr
+  labels:
+    app: bazarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bazarr
+  template:
+    metadata:
+      labels:
+        app: bazarr
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - home-lab
+      containers:
+        - name: bazarr
+          image: lscr.io/linuxserver/bazarr:v1.6.2-ls367
+          ports:
+          - containerPort: 6767
+            protocol: TCP
+          env:
+            - name: PGID
+              value: "1001"
+            - name: PUID
+              value: "1001"
+            - name: TZ
+              value: Etc/UTC
+          volumeMounts:
+            - mountPath: /config
+              name: bazarr-pvc
+            - mountPath: /downloads
+              name: downloads
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+            requests:
+              cpu: 100m
+              memory: 512Mi
+      restartPolicy: Always
+      volumes:
+        - name: bazarr-pvc
+          persistentVolumeClaim:
+            claimName: bazarr-pvc
+        - name: downloads
+          hostPath:
+            path: /var/mnt/media/downloads
+            type: Directory

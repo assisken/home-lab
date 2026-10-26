@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: prometheus
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    # Disabled until an Alertmanager is deployed (else DNS errors every scrape).
+    # alerting:
+    #   alertmanagers:
+    #     - static_configs:
+    #         - targets:
+    #           - alertmanager:9093
+
+    # Matches nothing until a rules/ volume is mounted.
+    rule_files:
+      - "rules/*.yml"
+
+    scrape_configs:
+      - job_name: 'apps'
+        scrape_interval: 10s
+        kubernetes_sd_configs:
+          - role: pod
+
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          action: keep
+          regex: true
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+          action: replace
+          target_label: __metrics_path__
+          regex: (.+)
+        - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+          action: replace
+          regex: ([^:]+)(?::\d+)?;(\d+)
+          replacement: $1:$2
+          target_label: __address__
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+        - source_labels: [__meta_kubernetes_namespace]
+          action: replace
+          target_label: namespace
+        - source_labels: [__meta_kubernetes_pod_name]
+          action: replace
+          target_label: pod
+        - source_labels: [__meta_kubernetes_pod_label_app]
+          action: replace
+          target_label: app
+        # job: the pod's `app` label, else app.kubernetes.io/name (Helm charts
+        # such as traefik, cilium-operator and sealed-secrets set only that).
+        # regex (.+) skips an empty label instead of writing an empty job,
+        # which used to delete the label from those targets.
+        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          regex: (.+)
+          target_label: job
+        - source_labels: [__meta_kubernetes_pod_label_app]
+          regex: (.+)
+          target_label: job
+

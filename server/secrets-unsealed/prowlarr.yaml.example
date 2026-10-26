@@ -1,0 +1,14 @@
+# Template for secrets-unsealed/prowlarr.yaml. scripts/init-secrets.sh copies it
+# and fills every @GEN...@ placeholder; replace CHANGE_ME by hand.
+# Then: make -C server seal-prowlarr
+# The *arr app generates its own key on first start: copy it from
+# Prowlarr -> Settings -> General -> Security -> API Key, reseal, restart.
+# Until then only the exportarr sidecar fails; the app itself runs.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: prowlarr
+  namespace: default
+type: Opaque
+stringData:
+  api-key: "CHANGE_ME"

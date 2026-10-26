@@ -1,0 +1,26 @@
+# kubeseal's default controller name, so the CLI works without flags.
+fullnameOverride: sealed-secrets-controller
+namespace: kube-system
+
+# Old keys are kept, but re-take the key backup (SECRETS.md) after each renewal.
+keyrenewperiod: "720h"
+
+nodeSelector:
+  kubernetes.io/hostname: home-lab
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# No prometheus-operator here; Prometheus discovers pods by annotation.
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/metrics"
+  prometheus.io/port: "8081"
+
+ingress:
+  enabled: false

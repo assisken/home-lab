@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: backup
+  name: backup-script
+data:
+  backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    src=/local-path
+    dst=/backup/metadata
+
+    # The marker is written once, right after mkfs. Without it /backup is the
+    # bare mountpoint on the root disk (the volume failed to mount), and the
+    # backup would quietly fill the NVMe instead.
+    if [ ! -f /backup/.backup-volume ]; then
+      echo "no /backup/.backup-volume: the backup volume is not mounted" >&2
+      exit 1
+    fi
+
+    # Not worth keeping: regenerable or huge.
+    skip='_(prometheus-storage|grafana-storage)$'
+
+    mkdir -p "$dst"
+    today=$(date +%F)
+    prev=$(find "$dst" -mindepth 1 -maxdepth 1 -name '20??-??-??' | sort | tail -n 1)
+    new="$dst/.$today.partial"
+    rm -rf "$new"
+    mkdir -p "$new/pvc"
+
+    for dir in "$src"/pvc-*; do
+      [ -d "$dir" ] || continue
+      # pvc-<uid>_<namespace>_<claim> -> <namespace>_<claim>: stable across a
+      # cluster rebuild, so --link-dest still finds yesterday's copy.
+      name=${dir#*_}
+      [[ $name =~ $skip ]] && continue
+      link=()
+      [ -n "$prev" ] && [ -d "$prev/pvc/$name" ] && link=(--link-dest="$prev/pvc/$name")
+      rsync -aHAX --numeric-ids "${link[@]}" \
+        --exclude='/cache/' --exclude='/.cache/' --exclude='/transcodes/' \
+        --exclude='/data/transcodes/' --exclude='/logs/' --exclude='/log/' \
+        --exclude='/downloads/' \
+        "$dir/" "$new/pvc/$name/"
+    done
+
+    # A file copy of a live SQLite database can catch it mid-write. Replace
+    # each copy with SQLite's online backup. Only real SQLite files (by
+    # header): `.db` is also used by BoltDB and Mesa's shader cache,
+    # whose plain copies are kept as they are. Via a temp file and mv: the copy
+    # may be a hard link shared with older snapshots, and writing into it in
+    # place would change those too.
+    find "$new/pvc" -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \) |
+      while read -r copy; do
+        rel=${copy#"$new/pvc/"}
+        name=${rel%%/*}
+        orig=$(find "$src" -maxdepth 1 -name "pvc-*_$name" | head -n 1)/${rel#*/}
+        [ "$(head -c 15 "$copy")" = "SQLite format 3" ] || continue
+        # The backup is self-contained; a stale -wal next to it would be
+        # replayed over it on the first open after a restore.
+        python3 - "$orig" "$copy.tmp" <<'PY' && mv "$copy.tmp" "$copy" && rm -f "$copy-wal" "$copy-shm" ||
+    import sqlite3, sys
+    src = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+    out = sqlite3.connect(sys.argv[2])
+    src.backup(out)
+    out.close()
+    PY
+          { rm -f "$copy.tmp"; echo "sqlite backup failed, kept the file copy: $rel" >&2; }
+      done
+
+    mv "$new" "$dst/$today.tmp" && rm -rf "${dst:?}/$today" && mv "$dst/$today.tmp" "$dst/$today"
+
+    # Retention: the 14 newest nights, plus the 6 newest first-of-month ones.
+    find "$dst" -mindepth 1 -maxdepth 1 -name '20??-??-??' | sort -r |
+      awk 'NR > 14 && !/-01$/' | xargs -r rm -rf
+    find "$dst" -mindepth 1 -maxdepth 1 -name '20??-??-01' | sort -r |
+      awk 'NR > 6' | xargs -r rm -rf
+
+    du -sh "$dst/$today" --apparent-size
+    echo "backup $today done"

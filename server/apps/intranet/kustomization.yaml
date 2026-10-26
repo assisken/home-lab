@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Shared pieces for intranet-only routes (<app>.l.example.com).
+# Each app's own directory holds its Ingress; this holds what they all use.
+resources:
+  - intranet-lan-only-middleware.yaml
+  - traefik-dashboard-ingressroute.yaml

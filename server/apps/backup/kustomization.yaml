@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Nightly cold backup of app state (not media) to the `backup` volume: the
+# backup SSD, XFS, partition label `backup`, mounted at /var/mnt/backup
+# (talos/patches/volumes.yaml).
+#
+# Each night is a dated directory, metadata/YYYY-MM-DD/:
+#   pvc/<namespace>_<claim>/   every local-path PVC except the ones listed in
+#                              the script (metrics); SQLite files are taken
+#                              with SQLite's online backup
+# Unchanged files are hard links into the previous night (rsync --link-dest),
+# so a night costs only what changed. Kept: 14 dailies + 6 month-firsts.
+#
+# Restore a PVC: scale the app to 0, then from a node debug pod
+#   rsync -aHAX --delete /backup/metadata/<date>/pvc/default_<claim>/ <PV dir>/
+#
+# Run one now: kubectl create job --from=cronjob/backup backup-manual
+resources:
+  - backup-cronjob.yaml
+  - backup-script-configmap.yaml

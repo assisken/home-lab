@@ -1,0 +1,50 @@
+# Extra config documents, appended to the node's machine config.
+#
+# NVMe (system disk): EPHEMERAL (/var: containerd images, etcd, logs) is capped
+# so the rest of the disk can be a dedicated volume for local-path PVCs.
+apiVersion: v1alpha1
+kind: VolumeConfig
+name: EPHEMERAL
+provisioning:
+  diskSelector:
+    match: system_disk
+  maxSize: 200GiB
+  grow: false
+---
+# Every PVC (storageClassName: local-path, server/local-path). Mounted at
+# /var/mnt/local-path; takes the rest of the NVMe.
+apiVersion: v1alpha1
+kind: UserVolumeConfig
+name: local-path
+provisioning:
+  diskSelector:
+    match: system_disk
+  minSize: 100GiB
+  grow: true
+filesystem:
+  type: xfs
+---
+# The media HDD: one XFS partition over the whole disk, GPT name `media-xfs`.
+# Mounted at /var/mnt/media. Matched by partition label, not device name: USB
+# resets reshuffle sdX.
+apiVersion: v1alpha1
+kind: ExistingVolumeConfig
+name: media
+discovery:
+  volumeSelector:
+    match: volume.partition_label == "media-xfs"
+mount:
+  readOnly: false
+  disableAccessTime: true
+---
+# The backup SSD, XFS, partition label `backup`: nightly cold backups of app
+# state (server/apps/backup).
+apiVersion: v1alpha1
+kind: ExistingVolumeConfig
+name: backup
+discovery:
+  volumeSelector:
+    match: volume.partition_label == "backup"
+mount:
+  readOnly: false
+  disableAccessTime: true

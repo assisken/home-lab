@@ -1,0 +1,61 @@
+# Community dashboards, pinned by grafana.com id + revision or by a tagged URL.
+# The fetch-dashboards init container downloads them on every pod start into
+# /var/lib/grafana/dashboards/<folder>/ (on the PVC, so a failed download keeps
+# the last good copy, and a fresh PVC simply refetches). Dashboard JSON is not
+# committed: node-exporter-full alone is over the 256 KiB annotation limit of
+# client-side `kubectl apply`.
+#
+# Adding one: append "<folder>|<file>|<url>", apply, then
+#   kubectl rollout restart deploy/grafana
+# Removing a line deletes the dashboard on the next start.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: grafana
+  name: grafana-dashboards
+data:
+  dashboards.list: |
+    # folder|file|url. Chosen by checking each dashboard's metrics against
+    # this Prometheus (2026-10-07).
+    # node-exporter on home-lab: 208/226 metrics present (the rest is hardware this box lacks)
+    Infrastructure|node-exporter-full|https://grafana.com/api/dashboards/1860/revisions/45/download
+    # Traefik's official Kubernetes dashboard: 11/11
+    Infrastructure|traefik|https://grafana.com/api/dashboards/17347/revisions/9/download
+    # Prometheus self-monitoring: 42/57 (missing: cloud SD and rule evaluation, neither used here)
+    Infrastructure|prometheus|https://grafana.com/api/dashboards/3662/revisions/2/download
+    # exportarr's own dashboard, matching the exporter version in use. sonarr and
+    # lidarr are covered; prowlarr/bazarr panels need working exporters.
+    Media|arr|https://raw.githubusercontent.com/onedr0p/exportarr/v2.3.0/examples/grafana/dashboard2.json
+  fetch.sh: |
+    #!/bin/sh
+    # Never fails the pod: Grafana must start even if grafana.com is down.
+    set -u
+    dest=/var/lib/grafana/dashboards
+    mkdir -p "$dest"
+    keep=$(mktemp)
+    while IFS='|' read -r folder name url; do
+      case "$folder" in '' | '#'*) continue ;; esac
+      mkdir -p "$dest/$folder"
+      out="$dest/$folder/$name.json"
+      echo "$out" >>"$keep"
+      tmp="$dest/$folder/.$name.tmp"
+      if curl -fsSL --retry 3 --max-time 60 -o "$tmp" "$url"; then
+        # Exported dashboards reference their datasource as an import input
+        # (${DS_PROMETHEUS} and the like). File provisioning has no import
+        # step, so point them at the provisioned datasource directly.
+        sed -i -E 's/\$\{DS_[A-Za-z0-9_]+\}/'"$DS_UID"'/g' "$tmp"
+        mv "$tmp" "$out"
+        echo "ok      $folder/$name"
+      else
+        rm -f "$tmp"
+        echo "FAILED  $folder/$name (keeping the previous copy, if any)"
+      fi
+    done </etc/grafana-dashboards/dashboards.list
+    # Drop dashboards that are no longer listed.
+    find "$dest" -name '*.json' | grep -vxFf "$keep" | while read -r f; do
+      rm -f "$f"
+      echo "removed ${f#"$dest"/}"
+    done
+    rm -f "$keep"
+    exit 0

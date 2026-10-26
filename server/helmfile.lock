@@ -1,0 +1,16 @@
+version: v1.8.0
+dependencies:
+  - name: cilium
+    repository: https://helm.cilium.io
+    version: 1.20.2
+  - name: homarr
+    repository: oci://ghcr.io/homarr-labs/charts
+    version: 8.34.1
+  - name: sealed-secrets
+    repository: https://bitnami.github.io/sealed-secrets
+    version: 2.20.0
+  - name: traefik
+    repository: https://traefik.github.io/charts
+    version: 41.7.1
+digest: sha256:52ab5f89db1c6838ede98df2c763e42cceda4cc253abd44f208207bbc1fefd37
+generated: "2026-10-26T12:18:15.898368Z"

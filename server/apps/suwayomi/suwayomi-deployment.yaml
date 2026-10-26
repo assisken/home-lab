@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: suwayomi
+  name: suwayomi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: suwayomi
+  template:
+    metadata:
+      labels:
+        app: suwayomi
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - home-lab
+      containers:
+        - env:
+            - name: BIND_IP
+              value: 0.0.0.0
+            - name: BIND_PORT
+              value: "4567"
+            - name: EXTENSION_REPOS
+              value: '["https://raw.githubusercontent.com/keiyoushi/extensions/repo/index.min.json", "https://raw.githubusercontent.com/suwayomi/tachiyomi-extension/repo/index.min.json"]'
+            - name: FLARESOLVERR_ENABLED
+              value: "true"
+            - name: FLARESOLVERR_URL
+              value: http://flaresolverr:8191
+            - name: TZ
+              value: Etc/UTC
+            # Public at manga.example.com, so require Suwayomi's own login page.
+            - name: AUTH_MODE
+              value: ui_login
+            - name: AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: suwayomi
+                  key: username
+            - name: AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: suwayomi
+                  key: password
+          # Digest of the `preview` tag as of 2026-10-13. Kept on the preview channel
+          # deliberately — `stable` is a different, older build. Switching channels is a
+          # separate decision from pinning.
+          image: ghcr.io/suwayomi/suwayomi-server@sha256:9397e89561c3d0d05bd8657b89808bb306f4a228ca3d055b81c471cee834af41
+          name: suwayomi
+          ports:
+            - containerPort: 4567
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /home/suwayomi/.local/share/Tachidesk
+              name: suwayomi-claim0
+          # Javalin serves the web UI as a catch-all static handler, so *every* URL path
+          # answers 200 with index.html -- /health and /healthz included, they are not
+          # real endpoints. An httpGet probe would therefore stay green while the server
+          # is wedged. A GraphQL POST is the only check that goes through the Jetty
+          # thread pool, the GraphQL engine and an Exposed transaction, which is what
+          # actually jams. `aboutServer` is one of the few fields not behind the
+          # @requireAuth directive, so it works under AUTH_MODE=ui_login without creds.
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - >-
+                    curl -fsS -m 5 -X POST -H 'Content-Type: application/json'
+                    -d '{"query":"{aboutServer{version}}"}'
+                    http://127.0.0.1:4567/api/graphql | grep -q '"version"'
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - >-
+                    curl -fsS -m 5 -X POST -H 'Content-Type: application/json'
+                    -d '{"query":"{aboutServer{version}}"}'
+                    http://127.0.0.1:4567/api/graphql | grep -q '"version"'
+            periodSeconds: 30
+            timeoutSeconds: 10
+            # ~2 min unresponsive before a restart, so a long GC pause or a slow
+            # extension reload doesn't bounce the container.
+            failureThreshold: 4
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - >-
+                    curl -fsS -m 5 -X POST -H 'Content-Type: application/json'
+                    -d '{"query":"{aboutServer{version}}"}'
+                    http://127.0.0.1:4567/api/graphql | grep -q '"version"'
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 200m
+              memory: 1Gi
+      restartPolicy: Always
+      volumes:
+        - name: suwayomi-claim0
+          persistentVolumeClaim:
+            claimName: suwayomi-claim0

@@ -1,0 +1,12 @@
+# Template for secrets-unsealed/suwayomi.yaml. scripts/init-secrets.sh copies it
+# and fills every @GEN...@ placeholder; replace CHANGE_ME by hand.
+# Then: make -C server seal-suwayomi
+apiVersion: v1
+kind: Secret
+metadata:
+  name: suwayomi
+  namespace: default
+type: Opaque
+stringData:
+  username: "user"
+  password: "@GEN:suwayomi_password@"

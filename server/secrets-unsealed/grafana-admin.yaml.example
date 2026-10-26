@@ -1,0 +1,13 @@
+# Template for secrets-unsealed/grafana-admin.yaml. scripts/init-secrets.sh copies it
+# and fills every @GEN...@ placeholder; replace CHANGE_ME by hand.
+# Then: make -C server seal-grafana-admin
+# Only seeds a fresh Grafana database.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-admin
+  namespace: default
+type: Opaque
+stringData:
+  username: "admin"
+  password: "@GEN:grafana_admin_password@"

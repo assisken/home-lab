@@ -1,0 +1,3 @@
+# talhelper output: machine configs and talosconfig carry the cluster PKI in
+# cleartext. Regenerate with `talhelper genconfig`.
+clusterconfig/

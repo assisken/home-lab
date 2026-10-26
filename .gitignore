@@ -1,0 +1,8 @@
+# Cleartext inputs to kubeseal (and init-secrets.sh state); only the sealed
+# output is committed. The templates are tracked.
+server/secrets-unsealed/*
+!server/secrets-unsealed/README.md
+!server/secrets-unsealed/*.yaml.example
+
+# The Talos cluster PKI (`talhelper gensecret`). Back it up outside git.
+talos/talsecret.yaml

@@ -1,0 +1,18 @@
+# Every intranet route goes through this. Having no public DNS record is not
+# access control: Traefik answers on the home IP's 443, and anyone can send any
+# Host/SNI there. Only the LAN gets in.
+#
+# A hairpin through the public IP arrives with a rewritten source address and
+# gets 403. LAN clients therefore have to resolve *.l.example.com to
+# 192.168.1.2 directly (README.md, step 0).
+#
+# Reference: traefik.ingress.kubernetes.io/router.middlewares: default-lan-only@kubernetescrd
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: lan-only
+  namespace: default
+spec:
+  ipAllowList:
+    sourceRange:
+      - 192.168.0.0/16

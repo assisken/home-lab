@@ -1,0 +1,44 @@
+# Intranet only: home.l.example.com (the start page; homarr.l.example.com kept as an
+# alias). See apps/intranet for the allow-list.
+# The homarr Helm release (helmfile.yaml) keeps its chart ingress disabled;
+# this raw object routes to the chart's Service instead.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: homarr
+  namespace: default
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    # One wildcard cert for all of *.l.example.com, issued via DNS-01. It needs no
+    # public record, and it keeps individual app names out of CT logs.
+    traefik.ingress.kubernetes.io/router.tls.domains.0.main: "*.l.example.com"
+    # LAN only; the app's own login does the rest.
+    traefik.ingress.kubernetes.io/router.middlewares: default-lan-only@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - home.l.example.com
+        - homarr.l.example.com
+  rules:
+    - host: home.l.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: homarr
+                port:
+                  number: 7575
+    - host: homarr.l.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: homarr
+                port:
+                  number: 7575

@@ -1,0 +1,13 @@
+# Template for secrets-unsealed/db-encryption.yaml. scripts/init-secrets.sh copies it
+# and fills every @GEN...@ placeholder; replace CHANGE_ME by hand.
+# Then: make -C server seal-db-encryption
+# homarr SECRET_ENCRYPTION_KEY: 64 hex characters. A new key means re-entering
+# every integration credential stored in homarr.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-encryption
+  namespace: default
+type: Opaque
+stringData:
+  db-encryption-key: "@GENHEX:homarr_db_encryption_key@"

@@ -1,0 +1,42 @@
+# Cilium values for home-lab on Talos, per Talos's Cilium guide:
+#   - API server via KubePrism (localhost:7445), not the node IP, so the agent
+#     does not depend on the apiserver address before networking is up;
+#   - IPAM from the node's podCIDR (10.244.0.0/16) instead of Cilium's own
+#     10.0.0.0/8 pool, which overlaps the service range;
+#   - Talos mounts cgroup2 itself and drops SYS_MODULE from the agent;
+#   - no cni.binPath override: Talos keeps CNI binaries in /opt/cni/bin.
+namespaceOverride: "kube-system"
+k8sServiceHost: "localhost"
+k8sServicePort: "7445"
+kubeProxyReplacement: "true"
+ipam:
+  mode: kubernetes
+loadBalancer:
+  enabled: "true"
+operator:
+  replicas: 1
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+securityContext:
+  capabilities:
+    ciliumAgent:
+      - CHOWN
+      - KILL
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    cleanCiliumState:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+encryption:
+  enabled: true
+  type: wireguard

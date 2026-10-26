@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: deluge
+  name: deluge
+spec:
+  selector:
+    app: deluge
+  ports:
+    - name: "8112"
+      port: 8112
+      targetPort: 8112
+    - name: "6881"
+      port: 6881
+      targetPort: 6881
+    - name: 6881-udp
+      port: 6881
+      protocol: UDP
+      targetPort: 6881
+    - name: "58846"
+      port: 58846
+      targetPort: 58846

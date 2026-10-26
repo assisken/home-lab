@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grafana
+  name: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - home-lab
+      initContainers:
+        # Downloads the pinned dashboards listed in the grafana-dashboards
+        # ConfigMap. Runs as grafana's uid so the files on the PVC match.
+        - name: fetch-dashboards
+          image: curlimages/curl:8.22.0
+          command: ["/bin/sh", "/etc/grafana-dashboards/fetch.sh"]
+          env:
+            - name: DS_UID
+              value: eg0j2y23e1vk0c # grafana-provisioning datasources.yaml
+          securityContext:
+            runAsUser: 472
+            runAsGroup: 0
+          volumeMounts:
+            - mountPath: /var/lib/grafana
+              name: grafana-storage
+            - mountPath: /etc/grafana-dashboards
+              name: grafana-dashboards
+              readOnly: true
+          resources:
+            limits:
+              cpu: 200m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 16Mi
+      containers:
+        - env:
+            # Local admin, seeded from the grafana-admin SealedSecret. Grafana only
+            # reads these on a fresh database; later changes go through the UI or
+            #   kubectl exec deploy/grafana -- grafana cli admin reset-admin-password <pw>
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: username
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: password
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            - name: GF_SERVER_ROOT_URL
+              value: https://grafana.l.example.com
+          image: grafana/grafana:13.2.3
+          name: grafana
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/grafana
+              name: grafana-storage
+            - mountPath: /etc/grafana/provisioning/datasources
+              name: grafana-provisioning-datasources
+              readOnly: true
+            - mountPath: /etc/grafana/provisioning/dashboards
+              name: grafana-provisioning-dashboards
+              readOnly: true
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 100m
+              memory: 1Gi
+      restartPolicy: Always
+      volumes:
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: grafana-storage
+        - name: grafana-provisioning-datasources
+          configMap:
+            name: grafana-provisioning
+            items:
+              - key: datasources.yaml
+                path: datasources.yaml
+        - name: grafana-provisioning-dashboards
+          configMap:
+            name: grafana-provisioning
+            items:
+              - key: dashboards.yaml
+                path: dashboards.yaml
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboards

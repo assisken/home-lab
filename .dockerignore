@@ -1,0 +1,2 @@
+# The image carries tools only; the repo is bind-mounted at run time.
+*

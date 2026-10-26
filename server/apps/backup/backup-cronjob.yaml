@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    app: backup
+  name: backup
+spec:
+  schedule: "30 4 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: backup
+        spec:
+          restartPolicy: Never
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - home-lab
+          containers:
+            - name: backup
+              # A stock image: the tools come from apk on every run, so the job
+              # needs internet access at 04:30.
+              image: alpine:3.22.2
+              command:
+                - sh
+                - -c
+                - apk add --no-cache -q bash coreutils findutils rsync python3 && exec bash /scripts/backup.sh
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: "2"
+                  memory: 1Gi
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                # Read-write only so SQLite can take its shared lock for the
+                # online backup; nothing is written to it.
+                - name: local-path
+                  mountPath: /local-path
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: script
+              configMap:
+                name: backup-script
+            - name: local-path
+              hostPath:
+                path: /var/mnt/local-path
+                type: Directory
+            - name: backup
+              hostPath:
+                path: /var/mnt/backup
+                type: Directory

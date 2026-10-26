@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - grafana-admin-sealedsecret.yaml
+  - grafana-dashboards-configmap.yaml
+  - grafana-deployment.yaml
+  - grafana-ingress.yaml
+  - grafana-provisioning-configmap.yaml
+  - grafana-service.yaml
+  - grafana-storage-persistentvolumeclaim.yaml

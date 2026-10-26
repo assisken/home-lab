@@ -1,0 +1,30 @@
+# Intranet only: musicseerr.l.example.com. See apps/intranet for the allow-list.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: musicseerr
+  namespace: default
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    # One wildcard cert for all of *.l.example.com, issued via DNS-01. It needs no
+    # public record, and it keeps individual app names out of CT logs.
+    traefik.ingress.kubernetes.io/router.tls.domains.0.main: "*.l.example.com"
+    # LAN only; the app's own login does the rest.
+    traefik.ingress.kubernetes.io/router.middlewares: default-lan-only@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - musicseerr.l.example.com
+  rules:
+    - host: musicseerr.l.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: musicseerr
+                port:
+                  number: 8688

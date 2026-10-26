@@ -1,0 +1,50 @@
+ingressRoute:
+  dashboard:
+    enabled: true
+    matchRule: Host(`localhost`)
+    entryPoints:
+      - web
+providers:
+  kubernetesGateway:
+    enabled: true
+gateway:
+  listeners:
+    web:
+      namespacePolicy:
+        from: All
+ports:
+  web:
+    hostPort: 80
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    hostPort: 443
+# The pod binds hostPorts 80/443 on a single node, so the chart's default
+# surge-first rollout (maxSurge 1 / maxUnavailable 0) can never schedule the
+# new pod while the old one holds the ports — the upgrade hangs Pending
+# forever. Take the old pod down first instead.
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 0
+persistence:
+  enabled: true
+  size: 128Mi
+  storageClass: local-path
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "admin@example.com"
+      storage: /data/acme.json
+      dnsChallenge:
+        provider: cloudflare
+env:
+- name: CF_DNS_API_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: cloudflare
+      key: token

@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - jellyfin-claim0-persistentvolumeclaim.yaml
+  - jellyfin-deployment.yaml
+  - jellyfin-ingress.yaml
+  - jellyfin-metrics-ingress.yaml
+  - jellyfin-service-node-port.yaml
+  - jellyfin-service.yaml

@@ -1,0 +1,13 @@
+# Template for secrets-unsealed/cloudflare.yaml. scripts/init-secrets.sh copies it
+# and fills every @GEN...@ placeholder; replace CHANGE_ME by hand.
+# Then: make -C server seal-cloudflare
+# Cloudflare API token with Zone:DNS:Edit on your zone (Let's Encrypt DNS-01 in
+# Traefik). kube-system, so apply the sealed file with kubectl apply -f, not -k.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudflare
+  namespace: kube-system
+type: Opaque
+stringData:
+  token: "CHANGE_ME"

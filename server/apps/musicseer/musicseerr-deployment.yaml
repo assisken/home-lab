@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert --file ./apps/musicseer/docker-compose.yml
+    kompose.version: 1.38.0 (HEAD)
+  labels:
+    io.kompose.service: musicseerr
+  name: musicseerr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: musicseerr
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert --file ./apps/musicseer/docker-compose.yml
+        kompose.version: 1.38.0 (HEAD)
+      labels:
+        io.kompose.service: musicseerr
+    spec:
+      containers:
+        - env:
+            - name: PUID
+              value: "1001"
+            - name: PGID
+              value: "1001"
+            - name: PORT
+              value: "8688"
+            - name: TZ
+              value: Etc/UTC
+          # Upstream renamed MusicSeerr to DroppedNeedle (github.com/DroppedNeedle);
+          # the old habirabbu/musicseerr image stopped at v2.11.0. Same config,
+          # cache and port; the k8s names here still say musicseerr.
+          image: ghcr.io/droppedneedle/droppedneedle:v2.15.0
+          name: musicseerr
+          ports:
+            - containerPort: 8688
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /app/config
+              name: musicseerr-claim0
+            - mountPath: /app/cache
+              name: musicseerr-claim1
+            - mountPath: /music
+              name: music
+              readOnly: true
+      restartPolicy: Always
+      volumes:
+        - name: musicseerr-claim0
+          persistentVolumeClaim:
+            claimName: musicseerr-claim0
+        - name: musicseerr-claim1
+          persistentVolumeClaim:
+            claimName: musicseerr-claim1
+        - name: music
+          hostPath:
+            path: /var/mnt/media/downloads/Music
+            type: Directory

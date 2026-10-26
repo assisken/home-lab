@@ -1,0 +1,14 @@
+# Was a NodePort (30001); now reached as https://grafana.l.example.com only.
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: grafana
+  name: grafana
+spec:
+  type: ClusterIP
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000

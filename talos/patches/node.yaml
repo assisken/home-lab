@@ -1,0 +1,8 @@
+# Strategic-merge patch over the node's machine config.
+machine:
+  kubelet:
+    # The Cilium interfaces also carry addresses; pin the node IP to the LAN
+    # one.
+    nodeIP:
+      validSubnets:
+        - 192.168.1.0/24

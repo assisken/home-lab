@@ -1,0 +1,14 @@
+# Template for secrets-unsealed/sonarr.yaml. scripts/init-secrets.sh copies it
+# and fills every @GEN...@ placeholder; replace CHANGE_ME by hand.
+# Then: make -C server seal-sonarr
+# The *arr app generates its own key on first start: copy it from
+# Sonarr -> Settings -> General -> Security -> API Key, reseal, restart.
+# Until then only the exportarr sidecar fails; the app itself runs.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sonarr
+  namespace: default
+type: Opaque
+stringData:
+  api-key: "CHANGE_ME"

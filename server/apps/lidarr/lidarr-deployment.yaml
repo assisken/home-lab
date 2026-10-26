@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: lidarr
+  name: lidarr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lidarr
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: lidarr
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "9707"
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - home-lab
+      containers:
+        - env:
+            - name: PGID
+              value: "1001"
+            - name: PUID
+              value: "1001"
+            - name: TZ
+              value: Etc/UTC
+          image: lscr.io/linuxserver/lidarr:3.1.0.4875-ls43
+          name: lidarr
+          ports:
+            - containerPort: 8686
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /config
+              name: lidarr-claim0
+            - mountPath: /music
+              name: music
+            - mountPath: /downloads
+              name: downloads
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+            requests:
+              cpu: 200m
+              memory: 1Gi
+        - name: lidarr-exporter
+          image: ghcr.io/onedr0p/exportarr:v2.3.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - lidarr
+          env:
+            - name: PORT
+              value: "9707"
+            - name: URL
+              value: "http://localhost:8686"
+            - name: APIKEY
+              valueFrom:
+                secretKeyRef:
+                  name: lidarr
+                  key: api-key
+          ports:
+            - name: monitoring
+              containerPort: 9707
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: monitoring
+            failureThreshold: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: monitoring
+            failureThreshold: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      restartPolicy: Always
+      volumes:
+        - name: lidarr-claim0
+          persistentVolumeClaim:
+            claimName: lidarr-claim0
+        - name: music
+          hostPath:
+            path: /var/mnt/media/downloads/Music
+            type: Directory
+        - name: downloads
+          hostPath:
+            path: /var/mnt/media/downloads
+            type: Directory

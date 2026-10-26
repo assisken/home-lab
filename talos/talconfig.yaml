@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/budimanjojo/talhelper/master/pkg/config/schemas/talconfig.json
+#
+# home-lab on Talos Linux. Rendered by talhelper into clusterconfig/
+# (git-ignored: it contains the cluster PKI) and applied with talosctl.
+# Runbook: README.md (in Russian).
+#
+#   talhelper genconfig                          # -> clusterconfig/
+#   talhelper gencommand apply | sh              # push config to the node
+#   talhelper gencommand upgrade | sh            # new Talos version/extensions
+#   talhelper gencommand upgrade-k8s | sh        # new Kubernetes version
+#
+# Image Factory builds a schematic/version on its first request, which can
+# take over a minute; `talosctl upgrade` does not wait that long. Warm a new
+# installer first: `talhelper genurl installer` prints <id>:<tag>, then
+#   curl -sI https://factory.talos.dev/v2/metal-installer/<id>/manifests/<tag>
+# until it answers 200.
+#
+# Secrets: talsecret.yaml (cluster PKI, `talhelper gensecret`). It is
+# git-ignored; keep a copy somewhere safe (README.md, step 1).
+clusterName: home-lab
+talosVersion: v1.14.2
+kubernetesVersion: v1.36.3
+endpoint: https://192.168.1.2:6443
+
+# Single node: it is the control plane and runs every workload.
+allowSchedulingOnControlPlanes: true
+
+# Talos defaults.
+clusterPodNets:
+  - 10.244.0.0/16
+clusterSvcNets:
+  - 10.96.0.0/12
+
+# Cilium is installed by helmfile (server/helm/cilium/values.yml), with
+# kube-proxy replacement, so Talos ships neither a CNI nor kube-proxy.
+cniConfig:
+  name: none
+
+patches:
+  - "@./patches/cluster.yaml"
+
+nodes:
+  - hostname: home-lab
+    ipAddress: 192.168.1.2
+    controlPlane: true
+    # The system NVMe. Talos owns this whole disk; the media disks are
+    # matched by partition label instead (patches/volumes.yaml).
+    # `talosctl -n <ip> get disks --insecure` in maintenance mode shows it.
+    installDiskSelector:
+      serial: "YOUR_NVME_SERIAL"
+    networkInterfaces:
+      # The onboard NIC; other interfaces stay unconfigured.
+      - deviceSelector:
+          hardwareAddr: "00:00:00:00:00:00" # your NIC's MAC
+        dhcp: false
+        addresses:
+          - 192.168.1.2/24
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 192.168.1.1
+    nameservers:
+      - 192.168.1.1
+    machineSpec:
+      mode: metal
+      arch: amd64
+      secureboot: false
+    schematic:
+      customization:
+        # SELinux off. Talos defaults to selinux=1 in permissive mode, which
+        # protects nothing here but logs every access to unlabeled files on
+        # the media and backup disks: a backup run can flood the kernel audit
+        # log. Kernel args live in the schematic; `-selinux` drops the default.
+        extraKernelArgs:
+          - -selinux
+          - selinux=0
+        systemExtensions:
+          officialExtensions:
+            # AMD CPU microcode and GPU firmware: /dev/dri/renderD128 for
+            # Jellyfin's VAAPI. Use siderolabs/intel-ucode and siderolabs/i915
+            # on Intel.
+            - siderolabs/amd-ucode
+            - siderolabs/amdgpu
+    patches:
+      - "@./patches/node.yaml"
+      - "@./patches/volumes.yaml"
+      - "@./patches/firewall.yaml"

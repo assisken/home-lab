@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: deluge
+  name: deluge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deluge
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: deluge
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - home-lab
+      containers:
+        - env:
+            - name: DELUGE_LOGLEVEL
+              value: error
+            - name: PGID
+              value: "1001"
+            - name: PUID
+              value: "1001"
+            - name: TZ
+              value: Etc/UTC
+          image: lscr.io/linuxserver/deluge:2.2.0-ls384
+          name: deluge
+          ports:
+            - containerPort: 8112
+              protocol: TCP
+            - containerPort: 6881
+              protocol: TCP
+            - containerPort: 6881
+              protocol: UDP
+            - containerPort: 58846
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /config
+              name: deluge-config
+            - mountPath: /downloads
+              name: downloads
+      restartPolicy: Always
+      volumes:
+        - name: deluge-config
+          persistentVolumeClaim:
+            claimName: deluge-config
+        - name: downloads
+          hostPath:
+            path: /var/mnt/media/downloads
+            type: Directory

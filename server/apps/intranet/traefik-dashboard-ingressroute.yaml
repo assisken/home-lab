@@ -1,0 +1,24 @@
+# Traefik's own dashboard at traefik.l.example.com, LAN only. It lives here, in default, because the chart's
+# dashboard IngressRoute is in kube-system and Traefik refuses cross-namespace
+# middleware references (providers.kubernetesCRD.allowCrossNamespace is off).
+# api@internal is Traefik's built-in service and resolves from any namespace.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-dashboard
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`traefik.l.example.com`)
+      middlewares:
+        - name: lan-only
+      services:
+        - kind: TraefikService
+          name: api@internal
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: "*.l.example.com"
